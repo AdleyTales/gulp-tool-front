@@ -6,31 +6,69 @@ const rename = require('gulp-rename');
 const pump = require('pump');
 const imagemin = require('gulp-imagemin');
 const htmlmin = require('gulp-htmlmin');
+const rev = require('gulp-rev'); // 对文件名加MD5后缀
+const rev_html = require('gulp-rev-append'); //  给URL自动加上版本号
+const revCollector=require('gulp-rev-collector');//路径替换
+const clean=require('gulp-clean');//清理
+const concat = require('gulp-concat'); // 合并
 
 /**
- * 压缩css
+ * 合并文件任务
+ * 并没有实际作用 可以统计代码数
+ */
+gulp.task('concat', function (cb) {
+    pump([
+        gulp.src('src/js/*.js'),
+        concat('all.js'),//合并后的文件名
+        gulp.dest('dist/js')
+    ], cb);
+});
+
+/**
+ * css 处理任务
+ * css 压缩
+ * css md5 签名
  */
 gulp.task('cssmin', function () {
     gulp.src('src/css/*.css')
         .pipe(minifycss())
-        .pipe(gulp.dest('dist/css'));
+        .pipe(rev())
+        .pipe(gulp.dest('dist/css'))
+        .pipe(rev.manifest())
+        .pipe(gulp.dest('./rev/css'));
 });
 
 /**
- * 编译js
- * 压缩js
+ * js 处理任务
+ * 编译 es6+ => es5
+ * js 压缩
+ * js md5 签名
  */
 gulp.task('jsmin', function () {
-    gulp.src('src/scripts/*.js')
+    gulp.src('src/js/*.js')
         .pipe(babel({
             presets: ['@babel/env']
         }))
         .pipe(uglify())
-        .pipe(gulp.dest('dist/scripts'));
+        .pipe(rev())
+        .pipe(gulp.dest('dist/js'))
+        .pipe(rev.manifest())
+        .pipe(gulp.dest('./rev/js'));
 });
 
 /**
- * 压缩图片
+ * 路径替换任务
+ * css js签名过的文件 替换到html中
+ */
+ gulp.task('rev',function(){
+     gulp.src(['./rev/*/*json','./src/*.html'])
+         .pipe(revCollector())
+         .pipe(gulp.dest('./dist'));
+ });
+
+/**
+ * 图片处理任务
+ * images 压缩图片
  */
 gulp.task('imgmin', function () {
     gulp.src('src/images/*.{png,jpg,gif,ico,jpeg}')
@@ -44,6 +82,7 @@ gulp.task('imgmin', function () {
 });
 
 /**
+ * HTML处理任务
  * 压缩html
  */
 gulp.task('htmlmin', function () {
@@ -61,6 +100,21 @@ gulp.task('htmlmin', function () {
         .pipe(gulp.dest('dist/'));
 });
 
+//给html中添加版本的概念
+gulp.task('rev_html',function(){
+    gulp.src('./src/*.html')
+        .pipe(rev_html())
+        .pipe(gulp.dest('./dist'));
+});
+
+/**
+ * 清理文件任务
+ */
+ gulp.task('clean', function() {
+     gulp.src(['./dist'], {read: false})
+         .pipe(clean());
+ });
+
 /**
  * 移动lib
  */
@@ -72,4 +126,5 @@ gulp.task('mvFile', function () {
 /**
  * exec
  */
-gulp.task('default', ['jsmin', 'cssmin', 'imgmin', 'htmlmin', 'mvFile']);
+// gulp.task('default', ['jsmin', 'cssmin', 'imgmin', 'htmlmin', 'mvFile']);
+gulp.task('default', ['clean', 'jsmin', 'cssmin', 'rev']);
